@@ -1,0 +1,59 @@
+name: Bootstrap DRMS research draft
+
+on:
+  push:
+    branches:
+      - agent/decision-relevant-memory
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify and unpack research source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat bootstrap/drms_source.b64.* > /tmp/drms_source.tar.gz.b64
+          base64 --decode /tmp/drms_source.tar.gz.b64 > /tmp/drms_source.tar.gz
+          echo "13679bd8f3f07e53eeea74253e84d1ff5ebec8494d5e7779b0cc5ac00849951e  /tmp/drms_source.tar.gz" | sha256sum --check
+          tar -xzf /tmp/drms_source.tar.gz -C .
+          rm -f paper/.gitkeep
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install Python dependencies
+        run: python -m pip install -e '.[dev]'
+
+      - name: Install LaTeX dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            texlive-latex-base texlive-latex-extra texlive-fonts-recommended \
+            texlive-bibtex-extra
+
+      - name: Reproduce tests, experiments, figures, and papers
+        run: make clean test experiments figures paper
+
+      - name: Commit reproduced project
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git status --short
+          git commit -m "Build DRMS theory, experiments, and paper draft [bootstrap complete]"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
