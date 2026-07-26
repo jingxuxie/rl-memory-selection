@@ -12,6 +12,9 @@ on:
 permissions:
   contents: write
 
+env:
+  SOURCE_SHA256: 13679bd8f3f07e53eeea74253e84d1ff5ebec8494d5e7779b0cc5ac00849951e
+
 jobs:
   bootstrap:
     if: github.actor != 'github-actions[bot]'
@@ -23,13 +26,25 @@ jobs:
           ref: ${{ github.head_ref || github.ref_name }}
           fetch-depth: 0
 
+      - name: Preserve packed source for recovery
+        uses: actions/upload-artifact@v4
+        with:
+          name: drms-packed-source
+          path: |
+            bootstrap/drms_source.b64.*
+            bootstrap/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Verify and unpack research source
         shell: bash
         run: |
           set -euo pipefail
           cat bootstrap/drms_source.b64.* > /tmp/drms_source.tar.gz.b64
           base64 --decode /tmp/drms_source.tar.gz.b64 > /tmp/drms_source.tar.gz
-          echo "13679bd8f3f07e53eeea74253e84d1ff5ebec8494d5e7779b0cc5ac00849951e  /tmp/drms_source.tar.gz" | sha256sum --check
+          actual_sha="$(sha256sum /tmp/drms_source.tar.gz | awk '{print $1}')"
+          echo "decoded source SHA256: ${actual_sha}"
+          test "${actual_sha}" = "${SOURCE_SHA256}"
           tar -xzf /tmp/drms_source.tar.gz -C .
           rm -f paper/.gitkeep
 
