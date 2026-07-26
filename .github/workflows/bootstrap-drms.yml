@@ -36,6 +36,17 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Preserve official AAAI-27 author kit
+        uses: actions/upload-artifact@v4
+        with:
+          name: aaai27-source-kit
+          path: |
+            AAAI_AuthorKit27/aaai2027.sty
+            AAAI_AuthorKit27/aaai2027.bst
+            AAAI_AuthorKit27/ReproducibilityChecklist.tex
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Verify and unpack research source
         shell: bash
         run: |
