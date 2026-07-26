@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - agent/decision-relevant-memory
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -13,9 +17,10 @@ jobs:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
-      - name: Check out branch
+      - name: Check out source branch
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.head_ref || github.ref_name }}
           fetch-depth: 0
 
       - name: Verify and unpack research source
@@ -51,9 +56,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          target_branch="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git status --short
+          if git diff --cached --quiet; then
+            echo "No generated changes to commit."
+            exit 0
+          fi
           git commit -m "Build DRMS theory, experiments, and paper draft [bootstrap complete]"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          git push origin "HEAD:${target_branch}"
