@@ -1,0 +1,45 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests-and-experiments:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install Python dependencies
+        run: python -m pip install -e '.[dev]'
+      - name: Run theorem tests
+        run: make test
+      - name: Regenerate all experiment tables and figures
+        run: make experiments figures
+      - name: Verify committed result grids
+        run: |
+          git diff --exit-code -- results figures
+
+  paper-and-preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install Python dependencies
+        run: python -m pip install -e '.[dev]'
+      - name: Install LaTeX and PDF tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            texlive-latex-base texlive-latex-extra texlive-fonts-recommended \
+            texlive-bibtex-extra poppler-utils
+      - name: Build manuscript and run submission preflight
+        run: make submission-check
+      - name: Verify committed PDFs
+        run: git diff --exit-code -- paper/main.pdf paper/supplement.pdf

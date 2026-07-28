@@ -1,0 +1,733 @@
+\documentclass[letterpaper]{article} % DO NOT CHANGE THIS
+\usepackage[submission]{aaai2027} % DO NOT CHANGE THIS
+\usepackage[hyphens]{url} % DO NOT CHANGE THIS
+\usepackage{graphicx} % DO NOT CHANGE THIS
+\urlstyle{rm} % DO NOT CHANGE THIS
+\def\UrlFont{\rm} % DO NOT CHANGE THIS
+\usepackage{natbib} % DO NOT CHANGE THIS AND DO NOT ADD OPTIONS
+\usepackage{caption} % DO NOT CHANGE THIS AND DO NOT ADD OPTIONS
+\frenchspacing % DO NOT CHANGE THIS
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+
+\pdfinfo{
+/TemplateVersion (2027.1)
+}
+\setcounter{secnumdepth}{0}
+
+\newtheorem{definition}{Definition}
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}{Proposition}
+\newtheorem{corollary}{Corollary}
+\newtheorem{lemma}{Lemma}
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
+\newtheorem{example}{Example}
+
+\newcommand{\cX}{\mathcal X}
+\newcommand{\cZ}{\mathcal Z}
+\newcommand{\cA}{\mathcal A}
+\newcommand{\PiM}{\Pi_m}
+\newcommand{\E}{\mathbb E}
+\newcommand{\Pp}{\mathbb P}
+\newcommand{\DRMS}{\textnormal{\textsc{DRMS}}}
+\newcommand{\argmin}{\operatorname*{arg\,min}}
+\newcommand{\argmax}{\operatorname*{arg\,max}}
+\newcommand{\KL}{D_{\mathrm{KL}}}
+\newcommand{\spanop}{\operatorname{span}}
+
+\title{How Much History Is Enough?\\
+Certifying Decision-Relevant Memory in Offline Reinforcement Learning}
+\author{Anonymous Submission}
+\affiliations{Anonymous submission}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Partial observability is often handled by conditioning a policy on a fixed
+window of recent observations and actions. Longer windows can reveal hidden
+state, but they enlarge the effective state space and may retain history that
+improves prediction without changing good decisions. We study how to select
+the shortest decision-sufficient history window from offline data. Candidate
+policies use suffixes of the full observable history; importantly, these
+suffixes need not be Markov. We introduce a cellwise \emph{decision ambiguity}:
+the minimum worst-case optimal-advantage loss incurred by applying one action
+distribution to full histories sharing a suffix. Zero ambiguity exactly
+characterizes the existence of an optimal suffix policy, while cumulative
+ambiguity sandwiches the best uniform value loss. We develop
+Decision-Relevant Memory Selection (\DRMS), which converts simultaneous
+confidence intervals for the full-history optimal $Q$-function into
+post-selection-valid memory certificates. We further derive a
+\emph{deployment-weighted} certificate that discounts rare conflicts under an
+explicit occupancy-ratio condition and remains valid with empirical occupancy
+estimation. In a canonical rare-context family, exact memory identification
+requires and, up to logarithms, is achieved with
+$\Theta(1/(p\gamma^2))$ episodes, where $p$ is the probability of a
+conflicting history and $\gamma$ its action gap. Across 4,840 finite-sample
+datasets and 700 configurations from random history MDPs, the certificates
+remain calibrated and exhibit the predicted coverage--gap scaling using only
+lightweight CPU computation.
+\end{abstract}
+
+\section{Introduction}
+
+An agent facing partial observability must decide what part of the past to
+retain. A common practical answer is frame stacking: concatenate a fixed
+number of recent observations and actions, then apply an ordinary
+reinforcement-learning algorithm. Choosing this window is consequential. Too
+little history aliases situations requiring different actions; too much
+history inflates the effective state space, worsens offline coverage, and
+invites spurious dependence on nuisance variables. This difficulty is not
+merely computational: conditioning offline RL directly on long observation
+histories can have poor sample complexity unless the representation discards
+information irrelevant to action selection \citep{hong2024histories}.
+Recurrent policies replace
+a fixed window with a learned state, but introduce a larger architecture and
+tuning problem and do not explain how much historical information the task
+actually requires.
+
+A tempting solution is to select memory through prediction: retain history as
+long as it improves prediction of the next observation or reward. This tests
+whether a truncated process is Markov, but Markov sufficiency is stronger than
+what control requires. Two failures are possible. First, an old nuisance
+variable may remain highly predictive of future observations even though it
+never changes the optimal action. Prediction then over-prescribes memory.
+Second, an old cue may determine which action receives reward while having no
+effect on subsequent observations. A next-observation test then under-prescribes
+memory. Figure~\ref{fig:separation} gives exact instances of both failures.
+
+This paper asks a more direct question:
+\begin{quote}
+\emph{What is the shortest history window for which offline data can certify a
+near-optimal policy?}
+\end{quote}
+We treat complete observable history as a finite-horizon MDP and compare
+nested policy classes that use only an $m$-step suffix. We never assume that
+the suffix itself is Markov. Instead, we ask whether full histories merged by
+the suffix can share an action without losing value. This yields a population
+quantity defined from full-history optimal advantages. It is zero exactly when
+a uniformly optimal $m$-memory policy exists and gives an explicit
+approximation-error certificate when exact sufficiency fails.
+
+The population characterization becomes an offline procedure by replacing
+unknown advantages with simultaneous upper confidence bounds. Each suffix
+cell requires only a small minimax linear program. The resulting method,
+\DRMS, either returns a short policy with a high-confidence value-loss bound or
+abstains when the data do not support one. Because the guarantee holds
+simultaneously across candidate memories, the same dataset may be used for
+selection without an additional post-selection penalty.
+
+Uniform protection against every feasible history can nevertheless be too
+conservative when a conflict is extremely rare. We therefore also derive a
+deployment-weighted version. It minimizes advantage under a reference
+occupancy and converts that local quantity into a deployment-value guarantee
+through an explicit density-ratio bound. An empirical correction preserves
+the guarantee when the reference occupancy is estimated from the same offline
+data. Thus the paper provides two complementary modes: a distribution-free
+uniform certificate and a less conservative deployment-specific certificate.
+
+Our contributions are:
+\begin{itemize}
+  \item We define \emph{decision ambiguity} for temporal suffix classes and
+  prove monotonicity, an exact decision-sufficiency characterization, and a
+  two-sided value-loss sandwich.
+  \item We prove that next-observation predictive memory and
+  decision-relevant memory are incomparable, and give a closed-form example
+  that exposes the action compromise measured by our criterion.
+  \item We introduce \DRMS, a simultaneous interval-based offline certifier
+  that remains valid even when every candidate short suffix is non-Markov.
+  We give an adaptive localization guarantee for approximate memory budgets.
+  \item We extend the framework to occupancy-weighted ambiguity, including a
+  robust empirical-occupancy correction and a concentrability-based deployment
+  guarantee.
+  \item We establish matching dependence $1/(p\gamma^2)$ for exact memory
+  identification in a rare-conflict family.
+  \item We validate the theorem mechanisms on 4,840 finite-sample datasets and
+  200 random history MDPs. The empirical 50\%-recovery threshold has log--log
+  slope $0.935$ against $1/(p\gamma^2)$, and no theorem violation is observed
+  in 700 randomized memory configurations.
+\end{itemize}
+
+\section{Related Work}
+
+\paragraph{Finite memory under partial observability.}
+General POMDP planning uses a belief over latent states
+\citep{kaelbling1998pomdp}. Finite-state controllers offer compact policy
+memory \citep{amato2010mealy}; known-model analyses quantify finite-window
+approximation under filtering stability \citep{kara2022finite}. Provable
+short-memory RL assumes that a recent window approximately decodes latent
+state and obtains complexity depending on the window length rather than the
+full horizon \citep{efroni2022short}. Recent metric belief approximation gives
+policy-conditional finite-memory loss bounds \citep{kim2026belief}. These
+results explain when a prescribed memory representation can approximate a
+belief policy, but they do not select the shortest decision-sufficient window
+from a fixed offline dataset.
+
+Offline POMDP learning has been analyzed through finite-memory Bellman
+operators and structural assumptions such as undercompleteness
+\citep{guo2022offlinepomdp}. Safe policy improvement with finite-state
+controllers assumes a fixed memory architecture and constrains updates using
+data support \citep{simao2023safe}. Memory traces replace raw windows by
+exponentially weighted summaries and provide offline on-policy evaluation
+bounds \citep{eberhard2025traces}. Recurrent model-free methods can also be
+strong empirical baselines \citep{ni2022recurrent}. Most directly,
+\citet{hong2024histories} show that raw observation histories can make offline
+RL sample-inefficient and motivate compact representations preserving features
+relevant to action selection. We study the complementary model-selection
+question: within nested temporal suffix classes, which is the shortest class
+whose decision loss can be certified from a fixed offline dataset? The
+selected suffix need not be Markov, and the output includes an explicit
+value-loss certificate rather than only a learned representation.
+
+\paragraph{Predictive representations and state abstraction.}
+Predictive-state representations summarize history through forecasts of
+future events \citep{littman2001predictive}; causal-state representations
+learn predictive partitions of action--observation histories
+\citep{zhang2019causal}. Self-predictive representation theory unifies many
+state and history objectives through latent transition prediction
+\citep{ni2024bridging}. A recent Markov Violation Score diagnoses non-Markov
+observations by testing whether history improves prediction
+\citep{mysore2026mvs}. Temporal Range instead measures how strongly a trained
+policy uses different lags through Jacobian sensitivities and compares the
+result with window ablations \citep{lafuente2025temporal}. These are natural
+diagnostic and representation-learning tools, but they do not provide an
+offline high-confidence value certificate for a data-selected memory. Our
+counterexamples further show that observation prediction alone is neither
+necessary nor sufficient for choosing policy memory.
+
+The state-abstraction literature instead asks which state distinctions
+preserve value or policy \citep{li2006unified,abel2016approximate,abel2020value},
+and action-sufficient representation learning targets variables needed for
+control \citep{huang2022action}. History-dependent feature abstractions have
+also been analyzed as controllers for fully observed MDPs
+\citep{patil2024history}. We specialize this decision-preservation idea to
+temporal suffix partitions and add a statistical problem absent from the
+population abstraction view: choosing the suffix from offline data with a
+simultaneous finite-sample certificate and a coverage-dependent lower bound.
+
+\paragraph{Offline RL, pessimism, and model selection.}
+Offline RL uses pessimism to avoid unsupported decisions
+\citep{jin2021pessimism,shi2022pessimistic} and connects naturally to
+imitation under limited coverage \citep{rashidinejad2021bridging}. Model-based
+selection can exploit policy-local model accuracy \citep{dong2023local}, while
+ModBE gives oracle inequalities for nested value-function classes
+\citep{lee2022oracle}. Our nested objects are policy information sets rather
+than Bellman model classes: a short suffix may be non-Markov and Bellman
+incomplete yet still contain an optimal policy. We estimate only one
+full-history confidence set and use it to certify the action compromises
+created by every suffix partition.
+
+\begin{table*}[t]
+\centering
+\small
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.16\textwidth}
+                >{\raggedright\arraybackslash}p{0.13\textwidth}
+                >{\raggedright\arraybackslash}p{0.18\textwidth}
+                >{\raggedright\arraybackslash}p{0.21\textwidth}
+                >{\raggedright\arraybackslash}p{0.20\textwidth}}
+\toprule
+Approach & Data regime & Memory object & Primary target & Guarantee relevant here \\
+\midrule
+Short-term memory \citep{efroni2022short} & Online & Fixed observation window & Learn under latent-state decodability & Regret/sample complexity for a chosen window \\
+Offline POMDP RL \citep{guo2022offlinepomdp} & Offline & Fixed finite memory & Value learning under structural assumptions & Policy suboptimality with prescribed memory \\
+Safe FSC improvement \citep{simao2023safe} & Offline & Fixed controller memory & Improve a behavior controller safely & High-probability improvement under support constraints \\
+Memory traces \citep{eberhard2025traces} & Offline evaluation & Fixed trace parameters & Compress history for value prediction & Evaluation error for trace representations \\
+History representations \citep{hong2024histories} & Offline & Learned compact history feature & Improve sample complexity of history-based RL & Sufficient representation conditions; bisimulation objective \\
+Temporal diagnostics \citep{mysore2026mvs,lafuente2025temporal} & Logged trajectories / trained policy & History score & Detect non-Markovity or quantify lag use & Predictive or sensitivity diagnostic; window guidance \\
+\textbf{DRMS (ours)} & Offline & \textbf{Selected suffix length} & \textbf{Preserve decisions within a loss budget} & \textbf{Post-selection uniform or deployment-weighted value certificate} \\
+\bottomrule
+\end{tabular}
+\caption{The closest lines of work differ in whether memory is fixed or
+selected and whether sufficiency is defined by prediction, latent-state
+recovery, or decision loss.}
+\label{tab:related}
+\end{table*}
+
+\section{Setting and Objective}
+
+Consider a finite-horizon controlled process with stages $h\in[H]$, bounded
+rewards $R_h\in[0,1]$, and finite action sets $\cA_h$. Let
+$X_h\in\cX_h$ be the complete observable action--observation history before
+action $A_h$. Complete history is a valid Markov state, with reward mean
+$r_h(x,a)$ and transition kernel $P_h(\cdot\mid x,a)$. Let $Q_h^*,V_h^*$
+be the corresponding optimal action-value and value functions.
+
+For memory length $m$, the map $\phi_{m,h}(x)$ retains the latest $m$
+observations and intervening actions, or all available history when $h<m$. A
+policy belongs to
+\[
+\Pi_m=\{\pi:\pi_h(\cdot\mid x)
+=\pi_h(\cdot\mid\phi_{m,h}(x))\}.
+\]
+The classes are nested, $\Pi_1\subseteq\cdots\subseteq\Pi_H$. We emphasize
+that $Z_h=\phi_{m,h}(X_h)$ need not be Markov for $m<H$.
+
+Our distribution-free target is the best uniform loss
+\[
+\mathcal E_m
+=\inf_{\pi\in\Pi_m}\max_{h,x}
+\bigl[V_h^*(x)-V_h^\pi(x)\bigr].
+\tag{1}\label{eq:uniformloss}
+\]
+For a tolerated loss $\epsilon$, define the oracle memory
+$m_\epsilon^*=\min\{m:G_m\leq\epsilon\}$ after $G_m$ is introduced below.
+This target differs from recovering a ``true'' predictive order: several
+memory lengths may be non-Markov while already supporting near-optimal
+decisions.
+
+\section{Decision-Relevant Memory}
+
+Define the optimal advantage loss
+$A_h^*(x,a)=V_h^*(x)-Q_h^*(x,a)\geq0$. For suffix $z$, let
+$C_{m,h}(z)=\{x:\phi_{m,h}(x)=z\}$ be the full histories that an
+$m$-memory policy must treat identically.
+
+\begin{definition}[Decision ambiguity]
+The ambiguity of one suffix cell is
+\[
+\eta_{m,h}(z)=
+\min_{p\in\Delta(\cA_h)}
+\max_{x\in C_{m,h}(z)}
+\E_{a\sim p}A_h^*(x,a).
+\tag{2}\label{eq:eta}
+\]
+Let $\eta_{m,h}=\max_z\eta_{m,h}(z)$ and
+$G_m=\sum_{h=1}^H\eta_{m,h}$.
+\end{definition}
+
+The action distribution $p$ is shared by every full history in the suffix
+cell. Thus $\eta_{m,h}(z)$ measures the smallest unavoidable one-step
+compromise caused by forgetting distinctions inside that cell. It is a linear
+program with $|\cA_h|+1$ variables. Randomization can reduce worst-case loss,
+but zero ambiguity has the same meaning for deterministic and stochastic
+policies: the cell contains a common optimal action.
+
+\begin{example}[Two conflicting histories]
+Suppose a cell contains $x_0,x_1$ and two actions. Their advantage rows are
+$(0,\alpha)$ and $(\beta,0)$. If action zero is chosen with probability $q$,
+the two losses are $\alpha(1-q)$ and $\beta q$. The minimax solution equalizes
+them:
+\[
+q^*=\frac{\alpha}{\alpha+\beta},\qquad
+\eta=\frac{\alpha\beta}{\alpha+\beta}.
+\tag{3}\label{eq:closedform}
+\]
+For a symmetric conflict $\alpha=\beta=\gamma$, forgetting costs
+$\gamma/2$. Under occupancy weights $(1-p,p)$, the corresponding expected
+cost is instead $\min\{(1-p)\alpha,p\beta\}$, foreshadowing the weighted
+extension.
+\end{example}
+
+\begin{theorem}[Population characterization]\label{thm:population}
+For every $m$:
+\begin{enumerate}
+  \item $G_{m+1}\leq G_m$.
+  \item $G_m=0$ if and only if there exists $\pi\in\Pi_m$ with
+  $V_h^\pi(x)=V_h^*(x)$ for every $h,x$.
+  \item The best attainable uniform loss satisfies
+  \[
+  \max_h\eta_{m,h}\leq\mathcal E_m\leq G_m.
+  \tag{4}\label{eq:sandwich}
+  \]
+\end{enumerate}
+The cellwise minimax policy $\pi^m$ additionally obeys
+$V_h^*(x)-V_h^{\pi^m}(x)\leq\sum_{t=h}^H\eta_{m,t}$.
+\end{theorem}
+
+\paragraph{Proof idea.}
+Longer memory refines every suffix cell, so the coarser action rule remains
+feasible and ambiguity cannot increase. For the upper bound, let
+$D_h(x)=V_h^*(x)-V_h^{\pi^m}(x)$. Adding and subtracting the full-history
+optimal continuation gives
+\begin{align}
+D_h(x)
+&=\E_{a\sim\pi_h^m}A_h^*(x,a)
+ +\E_{a,X'}D_{h+1}(X') \notag\\
+&\leq\eta_{m,h}+\|D_{h+1}\|_\infty.
+\tag{5}\label{eq:recursion}
+\end{align}
+Backward induction proves the cumulative bound. Conversely, any suffix policy
+must use one action distribution throughout each cell; replacing its
+continuation by $V^*$ can only increase its value, so some context incurs at
+least the cell minimax loss. Nonnegativity makes $G_m=0$ equivalent to a
+common zero-advantage action distribution in every cell. Full proofs are in
+the supplement.
+
+For behavior policy $\mu$, write $Z_h^m=\phi_{m,h}(X_h)$ and define the oracle
+next-observation residual
+\begin{align}
+R_m^{\rm obs}
+&=\sum_h H_\mu(O_{h+1}\mid Z_h^m,A_h) \notag\\
+&\quad-\sum_h H_\mu(O_{h+1}\mid X_h,A_h).
+\tag{6}\label{eq:predictive}
+\end{align}
+This mirrors observation-prediction diagnostics, not the stronger condition
+that reward and controlled suffix transitions are identical within every
+cell. The latter condition implies $G_m=0$ by backward induction; the converse
+need not hold.
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=0.93\textwidth]{../figures/decision_vs_prediction.pdf}
+  \caption{\textbf{Prediction and decision memory disagree in both
+  directions.} In the delayed-cue task (left), a stage-one cue determines the
+  final rewarding action, but later observations are constant:
+  $R_m^{\rm obs}=0$, whereas $G_m=1/2$ until the cue enters the suffix. In the
+  nuisance task (right), the cue predicts the terminal observation but never
+  changes the optimal action, so $G_m=0$ at every memory length. Values are
+  exact for $H=4$ and a balanced binary cue.}
+  \label{fig:separation}
+\end{figure*}
+
+\begin{proposition}[Prediction--decision separation]\label{prop:separation}
+For any horizon $H$, there are controlled processes under a uniform behavior
+policy in which: (i) $R_m^{\rm obs}=0$ for every $m$, but
+$G_m=\gamma/2$ for all $m<H$ and $G_H=0$; and (ii) $G_m=0$ for every $m$,
+but $R_m^{\rm obs}=1$ bit for all $m<H$. Thus an observation-prediction
+diagnostic can require arbitrarily more or less history than decision
+sufficiency.
+\end{proposition}
+
+\section{Offline Certification with \DRMS}
+
+Assume an offline procedure produces simultaneous intervals
+\[
+L_h(x,a)\leq Q_h^*(x,a)\leq U_h(x,a)
+\quad\text{for all }h,x,a
+\tag{7}\label{eq:qevent}
+\]
+with probability at least $1-\delta$. The result is modular: any valid
+full-history $Q^*$ intervals may be used.
+
+A naive upper advantage, $\max_b U_h(x,b)-L_h(x,a)$, is unnecessarily loose
+because comparing action $a$ with itself has exactly zero loss. Define
+\[
+\overline A_h(x,a)=
+\max\left\{0,\max_{b\neq a}[U_h(x,b)-L_h(x,a)]\right\}.
+\tag{8}\label{eq:upperadv}
+\]
+On event~\eqref{eq:qevent}, $A_h^*(x,a)\leq\overline A_h(x,a)$. Replacing
+$A_h^*$ by $\overline A_h$ in Eq.~\eqref{eq:eta} gives robust cell
+ambiguities $\overline\eta_{m,h}(z)$, total certificate
+$\overline G_m$, and robust suffix policy $\overline\pi^m$.
+
+\begin{algorithm}[t]
+\caption{Decision-Relevant Memory Selection (\DRMS)}
+\label{alg:drms}
+\begin{algorithmic}[1]
+\REQUIRE Offline trajectories, candidate memories $\mathcal M$, tolerance
+$\epsilon$, confidence $\delta$
+\STATE Construct simultaneous full-history intervals $(L,U)$
+\STATE Form upper advantages $\overline A$ by Eq.~\eqref{eq:upperadv}
+\FOR{$m\in\mathcal M$ in increasing order}
+  \FOR{each stage $h$ and suffix cell $z$}
+    \STATE Solve $\min_p\max_{x\in C_{m,h}(z)}\langle p,\overline A_h(x,\cdot)\rangle$
+  \ENDFOR
+  \STATE Sum cell maxima over stages to obtain $\overline G_m$
+  \IF{$\overline G_m\leq\epsilon$}
+    \RETURN $m$, robust suffix policy $\overline\pi^m$, certificate $\overline G_m$
+  \ENDIF
+\ENDFOR
+\RETURN longest candidate with an explicit abstention flag
+\end{algorithmic}
+\end{algorithm}
+
+\begin{theorem}[High-confidence value certificate]\label{thm:certificate}
+On event~\eqref{eq:qevent}, simultaneously for every memory $m$,
+\[
+V_h^*(x)-V_h^{\overline\pi^m}(x)
+\leq\sum_{t=h}^H\overline\eta_{m,t}
+\quad\text{for all }h,x.
+\tag{9}\label{eq:uniformcert}
+\]
+Consequently, whenever \DRMS{} certifies
+$\overline G_{\widehat m}\leq\epsilon$, its data-selected policy has uniform
+value loss at most $\epsilon$.
+\end{theorem}
+
+The proof repeats Eq.~\eqref{eq:recursion} with
+$A_h^*\leq\overline A_h$. Simultaneous intervals are essential: the guarantee
+then applies to all candidate memories on one event, including the memory
+chosen after inspecting their certificates.
+
+\begin{proposition}[Interval tightness]\label{prop:tightness}
+Suppose every interval has one-sided error at most $w$. Then
+\[
+G_m\leq\overline G_m\leq G_m+2Hw.
+\tag{10}\label{eq:inflation}
+\]
+\end{proposition}
+
+\begin{corollary}[Adaptive localization]\label{cor:localization}
+Let $m_\tau^*=\min\{m:G_m\leq\tau\}$, and include full history among the
+candidates. For every $\epsilon\geq2Hw$,
+\[
+m_\epsilon^*\leq\widehat m_\epsilon
+\leq m_{\epsilon-2Hw}^*.
+\tag{11}\label{eq:localization}
+\]
+If $m_{\rm dec}=\min\{m:G_m=0\}$ and
+$\Gamma=\min_{m<m_{\rm dec}}G_m>2Hw$, every
+$\epsilon\in[2Hw,\Gamma)$ recovers $m_{\rm dec}$.
+\end{corollary}
+
+Equation~\eqref{eq:localization} is an oracle-style statement for memory
+parsimony. The selected window is never shorter than the true
+$\epsilon$-sufficient window, while its excess length is controlled by the
+common interval resolution $2Hw$. This is not ordinary validation over
+separately trained models: statistical uncertainty is inherited from one
+full-history confidence set.
+
+\section{Deployment-Weighted Memory}
+
+Uniform ambiguity protects every feasible full history, including events that
+are negligible under deployment. Let $\nu_h$ be a reference distribution over
+full histories and define
+\[
+\begin{aligned}
+\ell_{m,h}^{\nu}(z,p)
+&=\sum_{x\in C_{m,h}(z)}\nu_h(x)
+  \E_{a\sim p}A_h^*(x,a),\\
+g_{m,h}^{\nu}
+&=\sum_z\min_{p\in\Delta(\cA_h)}\ell_{m,h}^{\nu}(z,p),
+\qquad G_m^\nu=\sum_hg_{m,h}^{\nu}.
+\end{aligned}
+\tag{12}\label{eq:weighted}
+\]
+Unlike the minimax cell problem, each weighted cell objective is linear, so a
+deterministic action is optimal except at ties. Partition refinement again
+gives $G_{m+1}^\nu\leq G_m^\nu$.
+
+\begin{theorem}[Deployment-weighted certificate]\label{thm:weighted}
+Let $\pi^{m,\nu}$ minimize Eq.~\eqref{eq:weighted}, and let
+$d_h^{\pi^{m,\nu}}$ denote its deployment occupancy from initial distribution
+$\rho$. If
+\[
+d_h^{\pi^{m,\nu}}(x)\leq C_h\nu_h(x)
+\quad\text{for every }h,x,
+\tag{13}\label{eq:concentrability}
+\]
+then
+\[
+V_1^*(\rho)-V_1^{\pi^{m,\nu}}(\rho)
+\leq\sum_{h=1}^H C_hg_{m,h}^{\nu}.
+\tag{14}\label{eq:weightedcert}
+\]
+\end{theorem}
+
+The performance-difference identity writes deployment loss as the sum of
+optimal advantages under $d_h^\pi$. Because these costs are nonnegative,
+Eq.~\eqref{eq:concentrability} changes measure to $\nu_h$ and yields
+Eq.~\eqref{eq:weightedcert}. The assumption is policy-specific: it must hold
+for the policy returned by the weighted optimization, not merely for a
+population comparator.
+
+The same idea remains valid offline. Replace $A^*$ by $\overline A$, estimate
+$\nu_h$ by $\widehat\nu_h$, and suppose
+$\|\widehat\nu_h-\nu_h\|_1\leq\xi_h$ and
+$0\leq\overline A_h\leq B_h$. For the robust policy selected using
+$\widehat\nu$, total-variation duality gives the simultaneous correction
+\[
+V_1^*(\rho)-V_1^{\widehat\pi_m}(\rho)
+\leq\sum_h C_h\left(
+\widehat{\overline g}_{m,h}+\frac{B_h\xi_h}{2}
+\right).
+\tag{15}\label{eq:empweighted}
+\]
+For $n$ independent trajectories, a Weissman-style occupancy radius is
+\[
+\xi_h=\min\left\{2,
+\sqrt{\frac{2\{|\cX_h|\log2+\log(H/\delta_{\rm occ})\}}{n}}
+\right\}.
+\tag{16}\label{eq:occupancyradius}
+\]
+If no credible finite $C_h$ is available, one should use the uniform
+certificate. In the rare-cue experiment below, actions do not affect state
+occupancy, so $C_h=1$ exactly.
+
+\section{Tabular Instantiation and Statistical Limit}
+
+For transparency, we instantiate Eq.~\eqref{eq:qevent} in a finite
+full-history MDP from $n$ independent behavior-policy episodes. Empirical
+rewards use union-bounded Hoeffding radii; empirical transitions use an
+$L_1$ radius based on \citet{weissman2003l1}. Optimistic and pessimistic
+dynamic programming propagate these model intervals using
+$|(P-\widehat P)^\top f|\leq\frac12\|P-\widehat P\|_1\spanop(f)$.
+Unobserved pairs receive the full reward radius and transition radius two;
+therefore the method abstains rather than extrapolating through unsupported
+histories. The supplement states the complete recursion and coverage proof.
+
+Coverage is not merely an artifact of our algorithm. The following two-point
+family isolates the intrinsic difficulty of deciding whether an old cue is
+needed.
+
+\begin{theorem}[Memory-order lower bound]\label{thm:lower}
+Fix $0<p<1$, $0<\gamma\leq1/2$, and $0<\delta<1/4$. There are two
+horizon-two processes observed under the same uniform behavior policy whose
+shortest decision-sufficient memories are one and two, respectively. Any
+estimator identifying the correct memory with error at most $\delta$ on both
+requires
+\[
+n\geq \frac{\log(1/(4\delta))}{6p\gamma^2}.
+\tag{17}\label{eq:lower}
+\]
+\end{theorem}
+
+A cue occurs with probability $p$. In the first model, action zero is better
+by $\gamma$ after either cue. In the second, the optimal action flips only
+after the rare cue. The one-episode KL divergence is at most $6p\gamma^2$;
+Bretagnolle--Huber then proves Eq.~\eqref{eq:lower}
+\citep{tsybakov2009nonparametric}. Thus memory selection is hard precisely
+when decision-conflicting histories are rare or their action gaps are small.
+
+\begin{corollary}[Matching upper rate]\label{cor:upper}
+Let $p\leq1/2$, and let $M$ be the number of full-history state--action pairs.
+Tabular \DRMS{} with tolerance $\gamma/4$ recovers the correct memory in both
+models with probability at least $1-\delta$ whenever
+\[
+n\geq\frac{32\log(8M/\delta)}{p\gamma^2}.
+\tag{18}\label{eq:upperrate}
+\]
+\end{corollary}
+The proof combines a lower tail for rare state--action counts with reward
+confidence radii small enough to separate the two actions. The lower bound is
+therefore tight in $p$ and $\gamma$, up to constants and logarithms.
+
+\section{Experiments}
+
+Our experiments are deliberately small: their purpose is to test theorem
+predictions, not to claim deep-control state of the art. Population values are
+computed exactly. Finite-sample studies use tabular counts, interval dynamic
+programming, and exact two-action cell solvers. All grids and raw results are
+included in the repository and supplement.
+
+\paragraph{Prediction selects the wrong memory in both directions.}
+Figure~\ref{fig:separation} uses horizon four. In the delayed-cue process, a
+memoryless final action incurs minimax loss $1/2$, while next observations are
+deterministic. In the nuisance process, the cue contributes one bit of
+terminal predictive information but action zero is optimal for both cues. The
+computed policy loss equals $G_m$ in both examples. Varying the delayed-cue
+gap verifies the exact phase transition from Eq.~\eqref{eq:closedform}: memory
+one is $\epsilon$-sufficient exactly when $\gamma\leq2\epsilon$.
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=0.94\textwidth]{../figures/coverage_gap_scaling.pdf}
+  \caption{\textbf{Finite-sample behavior follows the information-theoretic
+  scaling.} We vary rare-cue probability
+  $p\in\{0.05,0.1,0.2,0.5\}$, action gap
+  $\gamma\in\{0.2,0.3,0.5\}$, and eight dataset sizes, with 30 seeds per
+  point. The tolerance is $\gamma/4$. Left: all 12 recovery curves nearly
+  collapse against $np\gamma^2$. Right: the first grid size attaining at
+  least 50\% correct certification is approximately linear in
+  $1/(p\gamma^2)$; fitted log--log slope $0.935$.}
+  \label{fig:scaling}
+\end{figure*}
+
+\paragraph{Coverage--gap scaling and calibration.}
+Figure~\ref{fig:scaling} contains 2,880 independent datasets over 12
+$(p,\gamma)$ combinations. The 50\%-recovery threshold scales with
+$1/(p\gamma^2)$ as predicted by Theorem~\ref{thm:lower}. In a separate
+1,600-dataset sweep with four $p$ values and fixed
+$\gamma=0.5,\epsilon=0.1$, simultaneous $Q$-interval coverage and certificate
+validity are both 100\%, and no run falsely certifies a shorter memory. These
+are calibration checks, not replacements for the theorem.
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=0.94\textwidth]{../figures/weighted_memory.pdf}
+  \caption{\textbf{Deployment weighting avoids unnecessary memory for rare
+  conflicts.} Gap $\gamma=0.4$ and loss budget $\epsilon=0.1$.
+  Left: uniform ambiguity is $G_1=\gamma/2=0.2$ for every $p$, while the
+  deployment-weighted value is $G_1^\nu=p\gamma$ for $p\leq1/2$.
+  Right: finite-sample robust weighted DRMS certifies memory one with
+  increasing probability for $p\leq0.2$; it never does so for the balanced
+  conflict $p=0.5$. Uniform DRMS never certifies memory one in this experiment.}
+  \label{fig:weighted}
+\end{figure*}
+
+\paragraph{Deployment weighting.}
+Figure~\ref{fig:weighted} demonstrates the distinction between uniform and
+expected deployment loss. At $p=0.05$ and $0.10$, the weighted method reaches
+100\% short-memory certification by 2,500 episodes; at $p=0.20$, it reaches
+100\% by 25,000 episodes. At $p=0.50$, the population weighted cost is $0.2$
+and memory one is never certified under budget $0.1$. Across all 360 weighted
+runs, $Q$-interval coverage, occupancy-radius coverage, and the corrected
+value certificate are 100\%. This experiment uses $C_h=1$; no unknown density
+ratio is estimated.
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{lr}
+\toprule
+Random-history stress-test statistic & Result \\
+\midrule
+Random MDPs & 200 \\
+Memory configurations & 700 \\
+Recorded theorem violations & 0 \\
+95\% upper violation rate after 0 failures & 0.427\% \\
+Median relative slack of $G_m$ & 24.6\% \\
+90th-percentile relative slack & 65.5\% \\
+Weighted certificate validity & 100\% \\
+Robust weighted certificate validity & 100\% \\
+\bottomrule
+\end{tabular}
+\caption{Stress test over random binary-observation, binary-action history MDPs
+at horizons three and four. ``Violation'' aggregates monotonicity, both sides
+of the population sandwich, robust inflation, and uniform and weighted value
+certificates.}
+\label{tab:stress}
+\end{table}
+
+\paragraph{Random history MDPs.}
+To move beyond hand-designed cues, we sample rewards from Beta$(2,2)$ and
+fully supported observation transitions from Dirichlet$(1,1)$ while keeping
+complete action--observation histories distinct. Table~\ref{tab:stress}
+reports every candidate memory on 100 instances at each of horizons three and
+four, using synthetic $Q^*$ interval half-width $w=0.05$. There are no
+recorded theorem violations. The exact one-sided binomial bound quantifies the
+resolution of this finite stress test; it is not a proof. Scatter plots and
+all component checks appear in the supplement.
+
+\paragraph{Computation and reproducibility.}
+The suite contains 4,840 finite-sample datasets, 700 random-MDP memory
+configurations, and 16 theorem-driven tests. It uses no GPU. The code includes
+MDP constructors, uniform and weighted ambiguity solvers, interval dynamic
+programming, raw and summarized CSVs, figure generation, and a one-command
+paper build. Two-action minimax cells use an exact $O(n\log n)$ upper-envelope
+solver, cross-checked against generic linear programming in randomized unit
+tests.
+
+\section{Limitations and Conclusion}
+
+The theory enumerates a finite maximum observable history and therefore
+inherits exponential growth in raw history length. Its value is conceptual and
+statistical rather than a claim that tabular full-history enumeration scales
+to rich observations. Function approximation could replace the full-history
+interval oracle, but obtaining reliable simultaneous $Q^*$ bounds in that
+setting is itself a major offline-RL problem. The weighted guarantee requires
+a known or conservatively bounded deployment-to-reference ratio for the
+\emph{returned} policy; using an optimistic ratio estimate would invalidate
+the certificate. Our experiments are controlled theorem tests rather than
+standard POMDP benchmark comparisons.
+
+Within this scope, the results establish a simple principle: memory should be
+selected according to the action regret created by forgetting, not according
+to prediction alone. Decision ambiguity makes this principle exact at the
+population level. \DRMS{} turns it into an offline certificate that remains
+valid after selecting among memory lengths and can abstain under inadequate
+coverage. The weighted extension separates rare from uniformly dangerous
+conflicts, while the matching coverage--gap rate clarifies when any exact
+memory selector can succeed.
+
+\FloatBarrier
+\bibliography{references}
+
+\input{ReproducibilityChecklist.tex}
+
+\end{document}

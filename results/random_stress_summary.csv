@@ -1,0 +1,2 @@
+instances,memory_configurations,theorem_violations,zero_failure_95pct_upper_rate,median_relative_uniform_slack,p90_relative_uniform_slack,max_robust_inflation,weighted_certificate_valid_rate,robust_weighted_valid_rate,weighted_tighter_rate,median_weighted_certificate_ratio,max_concentrability
+200,700,0,0.004270473020189125,0.24642808916342435,0.6553235381096385,0.35833766802645994,1.0,1.0,0.32,1.0717798841154476,8.0
