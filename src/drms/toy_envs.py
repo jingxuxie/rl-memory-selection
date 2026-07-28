@@ -155,3 +155,68 @@ def make_memory_order_lower_bound_pair(
         terminal_observation=lambda _bit: "terminal",
     )
     return model_short, model_long
+
+
+def make_random_history_mdp(
+    *,
+    horizon: int = 3,
+    seed: int = 0,
+    n_observations: int = 2,
+    n_actions: int = 2,
+) -> HistoryMDP:
+    """Generate a small fully supported random observable-history MDP.
+
+    Every action-observation extension is represented explicitly, so suffix
+    partitions can alias histories even though the complete history is Markov.
+    Rewards and observation kernels vary across complete histories.
+    """
+
+    if horizon <= 0:
+        raise ValueError("horizon must be positive")
+    if n_observations <= 0 or n_actions <= 0:
+        raise ValueError("observation and action counts must be positive")
+    rng = np.random.default_rng(seed)
+
+    histories: list[list[History]] = [
+        [(f"o{observation}",) for observation in range(n_observations)]
+    ]
+    rewards: list[np.ndarray] = []
+    transitions: list[np.ndarray] = []
+
+    for _h in range(1, horizon + 1):
+        current = histories[-1]
+        next_histories: list[History] = []
+        next_lookup: dict[History, int] = {}
+        for history in current:
+            for action in range(n_actions):
+                for observation in range(n_observations):
+                    next_history = history + (action, f"o{observation}")
+                    if next_history not in next_lookup:
+                        next_lookup[next_history] = len(next_histories)
+                        next_histories.append(next_history)
+
+        reward = rng.beta(2.0, 2.0, size=(len(current), n_actions))
+        transition = np.zeros(
+            (len(current), n_actions, len(next_histories)), dtype=float
+        )
+        for state_index, history in enumerate(current):
+            for action in range(n_actions):
+                probabilities = rng.dirichlet(np.ones(n_observations))
+                for observation, probability in enumerate(probabilities):
+                    next_history = history + (action, f"o{observation}")
+                    transition[
+                        state_index, action, next_lookup[next_history]
+                    ] = probability
+
+        rewards.append(reward)
+        transitions.append(transition)
+        histories.append(next_histories)
+
+    initial_distribution = rng.dirichlet(np.ones(n_observations))
+    return HistoryMDP(
+        horizon=horizon,
+        histories=histories,
+        rewards=rewards,
+        transitions=transitions,
+        initial_distribution=initial_distribution,
+    )

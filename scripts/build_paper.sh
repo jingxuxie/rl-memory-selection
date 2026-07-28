@@ -3,11 +3,6 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PAPER_DIR="$ROOT/paper"
-AAAI_KIT_DIR="$ROOT/AAAI_AuthorKit27"
-
-export TEXINPUTS="$PAPER_DIR:$AAAI_KIT_DIR:${TEXINPUTS:-}"
-export BSTINPUTS="$PAPER_DIR:$AAAI_KIT_DIR:${BSTINPUTS:-}"
-export BIBINPUTS="$PAPER_DIR:${BIBINPUTS:-}"
 
 if command -v bibtex >/dev/null 2>&1; then
   BIBTEX_BIN="$(command -v bibtex)"

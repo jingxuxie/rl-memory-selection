@@ -1,83 +1,131 @@
-# Decision-Relevant Memory Selection for Offline RL
+# How Much History Is Enough?
 
-This repository develops **DRMS**, a theory-first method for selecting the
-shortest history window whose policy loss can be certified from offline data.
-The selected suffix does **not** need to be Markov.
+This repository develops **Decision-Relevant Memory Selection (DRMS)**, a
+theory-first method for selecting the shortest temporal suffix whose policy
+loss can be certified from offline reinforcement-learning data. The selected
+suffix is **not required to be Markov**.
 
-The key distinction is between:
+The central distinction is:
 
-- **next-observation predictive memory**: old history reduces uncertainty about
-  future observations; and
-- **decision-relevant memory**: forgetting old history forces one action rule
-  to compromise across contexts that require different decisions.
+- **predictive memory:** older history improves prediction of future
+  observations; and
+- **decision-relevant memory:** forgetting older history forces one action rule
+  to compromise across contexts that call for different actions.
 
-Observation-prediction diagnostics can over-prescribe memory because of
-predictive nuisance variables, or under-prescribe it when an old cue changes a
-rewarding action without changing later observations. Exact reward--transition
-Markov sufficiency is stronger and always implies decision sufficiency.
+These notions are incomparable for observation-only prediction. An old
+nuisance bit can remain predictive while never affecting an optimal action;
+conversely, an old cue can determine the rewarding action while leaving all
+later observations unchanged.
 
-DRMS estimates full-history optimal action values, converts simultaneous
-confidence intervals into upper bounds on optimal advantage loss, and solves
-small cellwise minimax programs to certify each candidate suffix length.
+## Main results
 
-## Current results
+For full histories `x` merged by an `m`-step suffix, DRMS defines a cellwise
+minimax optimal-advantage loss and its cumulative ambiguity `G_m`. The project
+contains proofs that:
 
-- A population characterization of decision-relevant temporal memory.
-- A value-loss sandwich and an exact common-optimal-action condition.
-- A high-confidence certificate valid for non-Markov suffix policies.
-- Exact-memory recovery under an advantage-separation condition.
-- Matching upper and lower rates, up to logarithms and constants, of
-  `1 / (p * gamma^2)` in a rare-context/action-gap family.
-- Exact delayed-cue and nuisance-memory counterexamples.
-- CPU-only population, calibration, and sample-complexity experiments.
-- An anonymous two-column manuscript and a full technical supplement.
+1. `G_m` decreases with memory length.
+2. `G_m = 0` exactly characterizes the existence of a uniformly optimal
+   `m`-memory policy.
+3. The best uniform value loss lies between the largest stage ambiguity and
+   `G_m`.
+4. Simultaneous full-history `Q*` intervals yield a post-selection-valid
+   certificate for every candidate memory, even when the suffix is non-Markov.
+5. A deployment-weighted extension discounts rare conflicts under an explicit
+   deployment/reference concentrability bound and an empirical-occupancy
+   correction.
+6. In a rare-conflict family with context probability `p` and action gap
+   `gamma`, exact memory recovery has matching upper and lower dependence
+   `1 / (p * gamma**2)`, up to constants and logarithms.
+
+## Validation summary
+
+All validation is tabular, CPU-only, and theorem-driven.
+
+- **4,840 finite-sample datasets** across uniform calibration,
+  coverage--gap scaling, and deployment-weighted certification.
+- **200 random history MDPs** and **700 memory configurations**.
+- **16 unit tests** covering all central constructions.
+- No observed violation of the population sandwich, robust uniform
+  certificate, interval-inflation bound, weighted population certificate, or
+  weighted robust certificate in the randomized sweep.
+- The empirical 50% recovery threshold has log--log slope **0.935** against
+  `1 / (p * gamma**2)`.
+- The exact one-sided 95% binomial upper bound on the randomized theorem-test
+  violation rate is **0.427%** after 0 failures in 700 configurations.
+
+These experiments validate the theoretical mechanisms; they do not claim
+state-of-the-art continuous-control performance.
 
 ## Repository layout
 
 ```text
-src/drms/                 Core MDP, ambiguity, confidence, and lower-bound code
+src/drms/                 MDP, ambiguity, confidence, occupancy, and lower-bound code
 experiments/              Reproducible experiment and plotting scripts
 results/                  Raw and summarized CSV outputs
-figures/                  Generated PDF/PNG figures
-paper/                    Main manuscript, supplement, and bibliography
-notes/                    Detailed proof notes and research roadmap
+figures/                  Generated PDF and PNG figures
+paper/                    AAAI-27 manuscript, supplement, checklist, and bibliography
+notes/                    Proof notes, claim audit, and research roadmap
 tests/                    Theorem-driven unit tests
+scripts/                  Reproduction, paper-build, and submission-preflight scripts
 ```
 
-## Reproduce
+## Reproduce everything
 
-Python 3.10 or newer is required.
+Python 3.10 or newer is required. A reference dependency snapshot is in
+`requirements-lock.txt`.
 
 ```bash
 python -m pip install -e '.[dev]'
-make test
-make experiments
-make figures
-make paper
+make reproduce
 ```
 
-The complete suite is tabular and CPU-only. To run the scripts separately:
+This command runs the tests, regenerates every independent experiment sweep, rebuilds every figure, builds
+the main paper and supplement with the unmodified AAAI-27 style, and performs
+PDF/result preflight checks.
+
+Equivalent one-shot script:
 
 ```bash
-python experiments/run_population.py
-python experiments/run_finite_sample.py
-python experiments/run_scaling.py
-python experiments/make_figures.py
+bash scripts/reproduce.sh
 ```
 
-## Paper
+Individual targets are also available:
 
-`paper/main.tex` uses a portable two-column fallback by default. The generated
-PDF is `paper/main.pdf`; complete proofs are in `paper/supplement.pdf`.
+```bash
+make test
+make population
+make finite-sample
+make scaling
+make weighted
+make random-stress
+make figures
+make paper
+make package
+make submission-check
+```
 
-For an actual AAAI submission, copy the unmodified `aaai2027.sty` and `aaai2027.bst` files from
-the repository's bundled `AAAI_AuthorKit27/` directory into `paper/`, change
-`\officialaaaifalse` to `\officialaaaitrue`, and rebuild. The portable fallback
-is intentionally not presented as the official conference format.
+## Paper artifacts
 
-## Status
+- `paper/main.pdf`: anonymous AAAI-27 manuscript with the official
+  reproducibility checklist after the references.
+- `paper/supplement.pdf`: complete proofs, all experiment grids, random stress
+  plots, and computational details.
+- `paper/main.tex` and `paper/supplement.tex`: submission sources.
 
-This branch establishes the core theorem stack, matching-rate construction,
-and lightweight validation. The highest-value next extension is an
-occupancy-weighted certificate or a random-history-MDP stress test; see
-`notes/roadmap.md` for the claim audit and remaining submission checks.
+The packaging target emits anonymous `submission/main_paper.pdf`,
+`submission/technical_appendix.pdf`, and `submission/code_and_data.zip`, together
+with SHA-256 manifests. The preflight script checks US-letter size, page count,
+embedded non-Type-3 fonts, unresolved references, package anonymity and hashes,
+complete result-grid row counts, and theorem-test violations.
+
+## Scope and limitations
+
+The tabular implementation enumerates a finite maximum history and therefore
+inherits exponential growth in raw history length. The weighted certificate
+requires a known or conservatively bounded deployment-to-reference density
+ratio. Function approximation, continuous observations, and adaptive history
+representations are outside the current theorem scope.
+
+## License
+
+Code and generated research artifacts are released under the MIT License.

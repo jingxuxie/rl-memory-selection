@@ -201,3 +201,36 @@ def tabular_q_confidence_intervals(
         reward_radii=reward_radii,
         transition_radii=transition_radii,
     )
+
+
+def empirical_state_occupancies(dataset: TabularDataset) -> list[FloatArray]:
+    """Return empirical full-state occupancies at each decision stage."""
+
+    if dataset.n_episodes <= 0:
+        raise ValueError("dataset must contain at least one episode")
+    occupancies: list[FloatArray] = []
+    for counts in dataset.counts:
+        occupancy = counts.sum(axis=1).astype(float) / dataset.n_episodes
+        occupancies.append(occupancy)
+    return occupancies
+
+
+def state_occupancy_l1_radii(
+    mdp: HistoryMDP,
+    n_episodes: int,
+    *,
+    delta: float = 0.05,
+) -> list[float]:
+    """Simultaneous Weissman-style L1 radii for stage occupancies."""
+
+    if n_episodes <= 0:
+        raise ValueError("n_episodes must be positive")
+    if not 0.0 < delta < 1.0:
+        raise ValueError("delta must lie in (0, 1)")
+    radii: list[float] = []
+    for h in range(1, mdp.horizon + 1):
+        n_states = mdp.n_states(h)
+        log_term = n_states * np.log(2.0) + np.log(mdp.horizon / delta)
+        radii.append(min(2.0, float(np.sqrt(2.0 * log_term / n_episodes))))
+    return radii
+

@@ -16,3 +16,5 @@ paper/*.synctex.gz
 paper/*.toc
 rendered_main/
 rendered_supp/
+submission/
+_pdf_renders/

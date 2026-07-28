@@ -158,11 +158,99 @@ def scaling_figure() -> None:
     save_figure(fig, "coverage_gap_scaling")
 
 
+
+def weighted_figure() -> None:
+    population = pd.read_csv(RESULTS / "weighted_population.csv")
+    finite = pd.read_csv(RESULTS / "weighted_finite_sample_summary.csv")
+    fig, axes = plt.subplots(1, 2, figsize=(7.2, 2.75))
+
+    axes[0].plot(
+        population["cue_probability"],
+        population["uniform_ambiguity"],
+        linestyle="--",
+        label="Uniform $G_1$",
+    )
+    axes[0].plot(
+        population["cue_probability"],
+        population["weighted_ambiguity"],
+        label="Weighted $G_1^\\nu$",
+    )
+    axes[0].axhline(
+        float(population["tolerance"].iloc[0]),
+        linestyle=":",
+        label="Loss budget $\\epsilon$",
+    )
+    axes[0].set_xscale("log")
+    axes[0].set_xlabel("Rare conflicting-context probability $p$")
+    axes[0].set_ylabel("Population certificate")
+    axes[0].set_title("Uniform vs. deployment-weighted", fontsize=10.5)
+    axes[0].grid(alpha=0.25)
+    axes[0].legend(frameon=False, fontsize=7.5)
+
+    for cue_probability, subset in finite.groupby("cue_probability", sort=True):
+        subset = subset.sort_values("n_episodes")
+        axes[1].plot(
+            subset["n_episodes"],
+            subset["weighted_short_rate"],
+            marker="o",
+            label=rf"$p={cue_probability:g}$",
+        )
+    axes[1].set_xscale("log")
+    axes[1].set_ylim(-0.03, 1.03)
+    axes[1].set_xlabel("Offline episodes")
+    axes[1].set_ylabel("Probability of certifying $m=1$")
+    axes[1].set_title("Finite-sample weighted selection", fontsize=10.5)
+    axes[1].grid(alpha=0.25)
+    axes[1].legend(frameon=False, fontsize=7.5, ncol=2)
+
+    fig.tight_layout(w_pad=1.3)
+    save_figure(fig, "weighted_memory")
+
+
+def random_stress_figure() -> None:
+    data = pd.read_csv(RESULTS / "random_stress_raw.csv")
+    fig, axes = plt.subplots(1, 2, figsize=(7.2, 2.75))
+
+    axes[0].scatter(
+        data["uniform_ambiguity"],
+        data["uniform_loss"],
+        s=9,
+        alpha=0.45,
+    )
+    upper = max(data["uniform_ambiguity"].max(), data["uniform_loss"].max())
+    axes[0].plot([0, upper], [0, upper], linestyle="--", linewidth=1)
+    axes[0].set_xlabel("Decision ambiguity $G_m$")
+    axes[0].set_ylabel("Uniform value loss")
+    axes[0].set_title("Population sandwich", fontsize=10.5)
+    axes[0].grid(alpha=0.25)
+
+    axes[1].scatter(
+        data["robust_weighted_certificate"],
+        data["robust_weighted_loss"],
+        s=9,
+        alpha=0.45,
+    )
+    upper = max(
+        data["robust_weighted_certificate"].max(),
+        data["robust_weighted_loss"].max(),
+    )
+    axes[1].plot([0, upper], [0, upper], linestyle="--", linewidth=1)
+    axes[1].set_xlabel("Robust weighted certificate")
+    axes[1].set_ylabel("Deployment value loss")
+    axes[1].set_title("Weighted certificate", fontsize=10.5)
+    axes[1].grid(alpha=0.25)
+
+    fig.tight_layout(w_pad=1.3)
+    save_figure(fig, "random_stress")
+
+
 def main() -> None:
     population_figure()
     finite_sample_figure()
     soft_relevance_figure()
     scaling_figure()
+    weighted_figure()
+    random_stress_figure()
     print(f"Wrote figures to {FIGURES}")
 
 

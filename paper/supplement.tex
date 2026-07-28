@@ -4,17 +4,16 @@
 \usepackage{graphicx} % DO NOT CHANGE THIS
 \urlstyle{rm} % DO NOT CHANGE THIS
 \def\UrlFont{\rm} % DO NOT CHANGE THIS
-\usepackage{natbib} % DO NOT CHANGE THIS AND DO NOT ADD ANY OPTIONS TO IT
-\usepackage{caption} % DO NOT CHANGE THIS AND DO NOT ADD ANY OPTIONS TO IT
+\usepackage{natbib} % DO NOT CHANGE THIS
+\usepackage{caption} % DO NOT CHANGE THIS
+\frenchspacing % DO NOT CHANGE THIS
 \usepackage{booktabs}
 \usepackage{amsmath,amssymb,amsthm,mathtools}
-\usepackage{microtype}
-\usepackage{xcolor}
-\frenchspacing % DO NOT CHANGE THIS
 
 \pdfinfo{
 /TemplateVersion (2027.1)
 }
+\setcounter{secnumdepth}{0}
 
 \newtheorem{theorem}{Theorem}
 \newtheorem{proposition}{Proposition}
@@ -23,13 +22,14 @@
 \newcommand{\E}{\mathbb E}
 \newcommand{\Pp}{\mathbb P}
 \newcommand{\cA}{\mathcal A}
+\newcommand{\cX}{\mathcal X}
 \newcommand{\spanop}{\operatorname{span}}
 \newcommand{\KL}{D_{\mathrm{KL}}}
 
-\title{Supplementary Material:\\
+\title{Technical Supplement:\\
 How Much History Is Enough? Certifying Decision-Relevant Memory in Offline Reinforcement Learning}
 \author{Anonymous Submission}
-\affiliations{}
+\affiliations{Anonymous submission}
 
 \begin{document}
 \maketitle
@@ -60,8 +60,7 @@ Let \(p_C\) minimize the objective for \(C\).  Then
 \begin{aligned}
 \eta(C')
 &\leq\max_{x\in C'}\E_{a\sim p_C}A_h^*(x,a)\\
-&\leq\max_{x\in C}\E_{a\sim p_C}A_h^*(x,a)\\
-&=\eta(C).
+&\leq\max_{x\in C}\E_{a\sim p_C}A_h^*(x,a)=\eta(C).
 \end{aligned}
 \]
 Taking the maximum over refined cells proves the stagewise claim; summing
@@ -82,10 +81,9 @@ at stage \(h+1\), then
 \[
 \begin{aligned}
 V_h^\pi(x)
-&=\E_{a\sim p_{h,z}}r_h(x,a)\\
-&\quad+\E_{a\sim p_{h,z}}P_hV_{h+1}^\pi(x,a)\\
-&=\E_{a\sim p_{h,z}}Q_h^*(x,a)\\
-&=V_h^*(x).
+&=\E_{a\sim p_{h,z}}
+  [r_h(x,a)+P_hV_{h+1}^\pi(x,a)]\\
+&=\E_{a\sim p_{h,z}}Q_h^*(x,a)=V_h^*(x).
 \end{aligned}
 \]
 This proves sufficiency by backward induction.
@@ -101,12 +99,8 @@ The expected optimal advantage loss is zero in every context of every cell, so
 \end{proof}
 
 \begin{theorem}[Value-loss sandwich]
-Let \(\mathcal E_m\) denote the best uniform loss attainable by \(\Pi_m\):
-\[
-\mathcal E_m=\inf_{\pi\in\Pi_m}\max_{h,x}
-\bigl[V_h^*(x)-V_h^\pi(x)\bigr].
-\]
-Then
+Let
+\(\mathcal E_m=\inf_{\pi\in\Pi_m}\max_{h,x}[V_h^*(x)-V_h^\pi(x)]\).  Then
 \[
 \max_h\eta_{m,h}\leq\mathcal E_m\leq\sum_h\eta_{m,h}.
 \]
@@ -118,8 +112,8 @@ cell and define \(D_h(x)=V_h^*(x)-V_h^{\pi^m}(x)\).  Since
 \[
 \begin{aligned}
 D_h(x)
-&=\E_{a\sim\pi_h^m(z)}A_h^*(x,a)\\
-&\quad+\E_{a,X'}D_{h+1}(X')\\
+&=\E_{a\sim\pi_h^m(z)}A_h^*(x,a)
+ +\E_{a,X'}D_{h+1}(X')\\
 &\leq\eta_{m,h}+\|D_{h+1}\|_\infty.
 \end{aligned}
 \]
@@ -185,13 +179,14 @@ On the interval event,
 \(A_h^*(x,a)\leq\overline A_h(x,a)\) for all \(h,x,a\).
 \end{lemma}
 \begin{proof}
-For every \(b\neq a\), interval validity gives
 \[
-Q_h^*(x,b)-Q_h^*(x,a)
-\leq U_h(x,b)-L_h(x,a).
+\begin{aligned}
+A_h^*(x,a)
+&=\max\{0,\max_{b\neq a}
+  [Q_h^*(x,b)-Q_h^*(x,a)]\}\\
+&\leq\overline A_h(x,a).
+\end{aligned}
 \]
-Taking the positive maximum over competitors proves
-\(A_h^*(x,a)\leq\overline A_h(x,a)\).
 \end{proof}
 
 \begin{theorem}[Simultaneous value certificate]
@@ -236,16 +231,138 @@ evaluate the robust objective at an exact minimizer; adding at most \(2w\) to
 each action cost adds at most \(2w\) to every mixture cost.  Sum over stages.
 \end{proof}
 
-\begin{corollary}[Exact memory recovery]
+\begin{corollary}[Adaptive localization and exact recovery]
+Let \(m_\tau^*=\min\{m:G_m\leq\tau\}\), with the full-history candidate
+included.  For every \(\epsilon\geq2Hw\), DRMS obeys
+\[
+m_\epsilon^*\leq\widehat m_\epsilon
+\leq m_{\epsilon-2Hw}^*.
+\]
 If \(m_{\rm dec}=\min\{m:G_m=0\}>1\), let
 \(\Gamma=\min_{m<m_{\rm dec}}G_m\).  If \(2Hw<\Gamma\), then every
 threshold \(\epsilon\in[2Hw,\Gamma)\) makes DRMS select
 \(m_{\rm dec}\) on the interval event.
 \end{corollary}
 \begin{proof}
-Every shorter memory has \(\overline G_m\geq G_m\geq\Gamma>\epsilon\),
-whereas \(\overline G_{m_{\rm dec}}\leq2Hw\leq\epsilon\).
+Certification of \(\widehat m_\epsilon\) implies
+\(G_{\widehat m_\epsilon}\leq\overline G_{\widehat m_\epsilon}\leq
+\epsilon\), hence \(m_\epsilon^*\leq\widehat m_\epsilon\).  Conversely,
+\[
+\overline G_{m_{\epsilon-2Hw}^*}
+\leq G_{m_{\epsilon-2Hw}^*}+2Hw\leq\epsilon,
+\]
+so the shortest certified memory cannot exceed
+\(m_{\epsilon-2Hw}^*\).  The full-history candidate ensures that the set is
+nonempty.  For exact recovery, every shorter memory has
+\(\overline G_m\geq G_m\geq\Gamma>\epsilon\), whereas
+\(\overline G_{m_{\rm dec}}\leq2Hw\leq\epsilon\).
 \end{proof}
+
+
+\section{Deployment-Weighted Certificate Proofs}
+
+For a reference distribution \(\nu_h\) over full histories, define
+\[
+\begin{aligned}
+\ell_{m,h}^{\nu}(z,p)
+&=\sum_{x\in C_{m,h}(z)}\nu_h(x)
+  \E_{a\sim p}A_h^*(x,a),\\
+g_{m,h}^{\nu}
+&=\sum_z\min_{p\in\Delta(\cA_h)}\ell_{m,h}^{\nu}(z,p),
+\qquad G_m^\nu=\sum_h g_{m,h}^\nu.
+\end{aligned}
+\]
+Because each cell objective is linear in \(p\), a deterministic action is
+optimal except at ties.
+
+\begin{lemma}[Weighted monotonicity]
+For every reference sequence \(\nu\),
+\(g_{m+1,h}^{\nu}\leq g_{m,h}^{\nu}\) and
+\(G_{m+1}^{\nu}\leq G_m^{\nu}\).
+\end{lemma}
+\begin{proof}
+An \((m+1)\)-suffix partition refines the \(m\)-suffix partition.  Any action
+rule feasible for the coarser partition remains feasible after assigning that
+same action to every refined subcell.  Minimizing over the larger refined
+policy class cannot increase the reference-weighted objective.  Sum over
+stages.
+\end{proof}
+
+\begin{theorem}[Population deployment certificate]
+Let \(\pi^{m,\nu}\) attain the weighted cell objectives above, and let
+\(d_h^{\pi^{m,\nu}}\) be its state occupancy from initial distribution
+\(\rho\).  If
+\[
+ d_h^{\pi^{m,\nu}}(x)\leq C_h\nu_h(x)
+ \quad\text{for every }h,x,
+\]
+then
+\[
+ V_1^*(\rho)-V_1^{\pi^{m,\nu}}(\rho)
+ \leq\sum_{h=1}^H C_hg_{m,h}^{\nu}.
+\]
+\end{theorem}
+\begin{proof}
+The finite-horizon performance-difference identity, written with the optimal
+advantage loss, is
+\[
+ V_1^*(\rho)-V_1^{\pi}(\rho)
+ =\sum_{h=1}^H
+ \E_{X_h\sim d_h^\pi,\,A_h\sim\pi_h}
+ A_h^*(X_h,A_h).
+\]
+All summands are nonnegative.  The density-ratio assumption therefore gives
+\[
+ \E_{d_h^\pi,\pi_h}A_h^*
+ \leq C_h\E_{\nu_h,\pi_h}A_h^*.
+\]
+For \(\pi=\pi^{m,\nu}\), the right-hand expectation is exactly
+\(g_{m,h}^{\nu}\).  Summing proves the claim.
+\end{proof}
+
+\begin{theorem}[Empirical occupancy and robust-cost correction]
+Suppose the simultaneous \(Q^*\)-interval event holds and
+\(0\leq\overline A_h(x,a)\leq B_h\).  Let
+\(\widehat\nu_h\) satisfy
+\(\|\widehat\nu_h-\nu_h\|_1\leq\xi_h\), and let
+\(\widehat\pi_m\) minimize the \(\widehat\nu\)-weighted robust costs.
+If its deployment occupancy obeys
+\(d_h^{\widehat\pi_m}(x)\leq C_h\nu_h(x)\), then
+\[
+ V_1^*(\rho)-V_1^{\widehat\pi_m}(\rho)
+ \leq\sum_{h=1}^H C_h\left(
+ \widehat{\overline g}_{m,h}+\frac{B_h\xi_h}{2}\right).
+\]
+For the clipped tabular intervals in this paper, one may take
+\(B_h=H-h+1\).
+\end{theorem}
+\begin{proof}
+Fix a stage and define
+\(f_h(x)=\E_{a\sim\widehat\pi_{m,h}(\phi_m(x))}\overline A_h(x,a)\).
+Then \(f_h\in[0,B_h]\).  Total-variation duality yields
+\[
+ \E_{\nu_h}f_h
+ \leq \E_{\widehat\nu_h}f_h+\frac{B_h}{2}
+ \|\widehat\nu_h-\nu_h\|_1
+ \leq\widehat{\overline g}_{m,h}+\frac{B_h\xi_h}{2}.
+\]
+The first inequality also holds for the data-selected \(f_h\), because the
+\(L_1\) event controls every bounded function simultaneously.  Combine
+\(A_h^*\leq\overline A_h\), the deployment-to-reference density-ratio bound,
+and the performance-difference identity, then sum over stages.
+\end{proof}
+
+For \(n\) independent episodes, the empirical stage-\(h\) state frequency
+\(\widehat\nu_h\) satisfies the simultaneous Weissman-style radius
+\[
+ \xi_h=\min\left\{2,
+ \sqrt{\frac{2\{|\cX_h|\log2+\log(H/\delta_{\rm occ})\}}{n}}
+ \right\}.
+\]
+The constants \(C_h\) must be known from the deployment design or replaced by
+valid upper bounds.  In the rare-cue weighted experiment, actions do not affect
+state occupancy, so \(C_h=1\) exactly.  When no finite or credible bound is
+available, the uniform DRMS certificate should be used.
 
 \section{Tabular Confidence Intervals}
 
@@ -382,17 +499,102 @@ each full-memory cell has \(\overline G_2=0\).  DRMS therefore selects one
 and two, respectively.
 \end{proof}
 
-\section{Additional Experiment}
+
+\section{Additional Experimental Details}
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=0.95\linewidth]{../figures/soft_relevance.pdf}
+  \includegraphics[width=\columnwidth]{../figures/soft_relevance.pdf}
   \caption{Population tolerance phase transition at horizon five.  An
   insufficient suffix has ambiguity \(\gamma/2\), so memory one is certified
   exactly when \(\gamma\leq2\epsilon\).}
+  \label{fig:soft-supp}
 \end{figure}
 
-All tests, raw outputs, and scripts are provided in the accompanying repository.
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=0.94\textwidth]{../figures/random_stress.pdf}
+  \caption{\textbf{Random history-MDP stress test.}  Left: the realized
+  uniform value loss of the population minimax policy lies below \(G_m\).
+  Right: the realized deployment loss of the robust weighted policy lies below its weighted certificate.
+  Dashed lines denote equality.  The suite contains 700 memory
+  configurations from 200 random history MDPs.}
+  \label{fig:random-supp}
+\end{figure*}
+
+The random generator uses binary observations and actions.  Initial
+observations and action-conditional next observations are sampled from
+Dirichlet\((1,1)\), and each state-action mean reward is sampled from
+Beta\((2,2)\).  Full action--observation histories remain distinct states, so
+short suffixes induce random aliasing.  We use horizons three and four, 100
+seeds per horizon, and synthetic \(Q^*\) interval half-width \(w=0.05\).
+Across all 700 memory configurations, there are no failures of uniform
+monotonicity, either side of the population sandwich, the robust certificate,
+the \(2Hw\) inflation bound, the weighted population certificate, or the
+weighted robust certificate.  The exact one-sided 95\% binomial upper bound on
+the violation probability after observing zero failures is
+\(1-0.05^{1/700}=0.427\%\).  Among configurations with nonzero realized
+loss, the median relative slack of the uniform population upper bound is
+24.6\%, with 90th percentile 65.5\%.
+
+\begin{table*}[t]
+\centering
+\small
+\begin{tabular}{p{0.16\textwidth}p{0.76\textwidth}}
+\toprule
+Experiment & Complete grid and repetitions \\
+\midrule
+Population separation & Tasks: delayed cue and predictive nuisance; horizons
+\(\{2,3,4,5,6,8\}\); all candidate memories; balanced cue; gap one. \\
+Soft relevance & Horizon five; 50 equally spaced gaps in \([0.02,1]\);
+\(\epsilon\in\{0.025,0.05,0.1,0.2\}\). \\
+Uniform calibration & Horizon four; \(p\in\{0.05,0.1,0.2,0.5\}\);
+\(n\in\{50,100,200,500,1000,2000,5000,10000\}\); gap 0.5;
+\(\epsilon=0.1\); \(\delta=0.05\); 50 seeds per point (1,600 datasets). \\
+Coverage--gap scaling & Horizon two;
+\(p\in\{0.05,0.1,0.2,0.5\}\);
+\(\gamma\in\{0.2,0.3,0.5\}\); eight sample sizes from 100 to 20,000;
+\(\epsilon=\gamma/4\); \(\delta=0.05\); 30 seeds (2,880 datasets). \\
+Weighted certificate & Gap 0.4, \(\epsilon=0.1\).  Population:
+20 logarithmically spaced values of \(p\) from 0.01 to 0.5.  Finite sample:
+\(p\in\{0.05,0.1,0.2,0.5\}\),
+\(n\in\{1000,2500,5000,10000,25000,50000\}\), 15 seeds;
+\(\delta=0.05\) split equally between \(Q\) and occupancy events
+(360 datasets). \\
+Random stress & Horizons \(\{3,4\}\); 100 seeds per horizon; every memory;
+interval half-width 0.05 (200 MDPs and 700 configurations). \\
+\bottomrule
+\end{tabular}
+\caption{All grids used in the reported experiments.  No result-dependent
+hyperparameter search is performed.}
+\label{tab:grids}
+\end{table*}
+
+\section{Computational Reproducibility}
+
+All stochastic scripts construct seeds deterministically from the displayed
+grid indices and expose the number of repetitions as a command-line argument.
+For the tabular trajectory datasets, episodes are simulated in vectorized
+stage batches and reduced to state--action counts, Bernoulli reward sums, and
+transition counts.  This retains exact episode sampling while keeping the
+largest sweep lightweight.
+The reported artifacts were regenerated on Debian GNU/Linux 13 using five
+AMD EPYC 9V74 vCPUs and 5.9 GiB RAM.  The software
+stack was Python 3.13.5, NumPy 2.3.5, SciPy 1.17.0, pandas 2.2.3, Matplotlib
+3.10.8, and pytest 9.0.2; continuous integration independently runs Python
+3.11.  No GPU is used.  The repository includes raw CSVs, generated figures,
+16 theorem-driven tests, and a single command that rebuilds all results and
+both manuscripts.
+
+The experimental metrics are certificate validity, simultaneous interval
+coverage, false short-memory certification, correct-memory certification,
+selected memory, realized value loss, and certificate slack.  These metrics
+were chosen to test the finite-sample statements directly rather than to claim
+benchmark dominance.  Recovery and certification rates are reported over
+independent seeds; for the zero-violation randomized test we additionally
+report an exact one-sided binomial bound.  Significance tests for pairwise
+algorithm improvements are not used because the paper makes no such
+performance-comparison claim.
 
 \bibliography{references}
 \end{document}
