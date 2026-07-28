@@ -7,8 +7,6 @@
 \usepackage{natbib} % DO NOT CHANGE THIS AND DO NOT ADD OPTIONS
 \usepackage{caption} % DO NOT CHANGE THIS AND DO NOT ADD OPTIONS
 \frenchspacing % DO NOT CHANGE THIS
-\usepackage{algorithm}
-\usepackage{algorithmic}
 \usepackage{booktabs}
 \usepackage{array}
 \usepackage{amsmath,amssymb,amsthm,mathtools}
@@ -415,26 +413,23 @@ $A_h^*$ by $\overline A_h$ in Eq.~\eqref{eq:eta} gives robust cell
 ambiguities $\overline\eta_{m,h}(z)$, total certificate
 $\overline G_m$, and robust suffix policy $\overline\pi^m$.
 
-\begin{algorithm}[t]
+\begin{figure}[t]
 \caption{Decision-Relevant Memory Selection (\DRMS)}
 \label{alg:drms}
-\begin{algorithmic}[1]
-\REQUIRE Offline trajectories, candidate memories $\mathcal M$, tolerance
-$\epsilon$, confidence $\delta$
-\STATE Construct simultaneous full-history intervals $(L,U)$
-\STATE Form upper advantages $\overline A$ by Eq.~\eqref{eq:upperadv}
-\FOR{$m\in\mathcal M$ in increasing order}
-  \FOR{each stage $h$ and suffix cell $z$}
-    \STATE Solve $\min_p\max_{x\in C_{m,h}(z)}\langle p,\overline A_h(x,\cdot)\rangle$
-  \ENDFOR
-  \STATE Sum cell maxima over stages to obtain $\overline G_m$
-  \IF{$\overline G_m\leq\epsilon$}
-    \RETURN $m$, robust suffix policy $\overline\pi^m$, certificate $\overline G_m$
-  \ENDIF
-\ENDFOR
-\RETURN longest candidate with an explicit abstention flag
-\end{algorithmic}
-\end{algorithm}
+\begin{enumerate}
+  \item Given offline trajectories, candidate memories $\mathcal M$,
+  tolerance $\epsilon$, and confidence $\delta$, construct simultaneous
+  full-history intervals $(L,U)$.
+  \item Form upper advantages $\overline A$ by Eq.~\eqref{eq:upperadv}.
+  \item For each $m\in\mathcal M$ in increasing order, solve
+  $\min_p\max_{x\in C_{m,h}(z)}
+  \langle p,\overline A_h(x,\cdot)\rangle$ for every stage $h$ and suffix
+  cell $z$, then sum the cell maxima to obtain $\overline G_m$.
+  \item Return the first $m$ with $\overline G_m\leq\epsilon$, together with
+  $\overline\pi^m$ and certificate $\overline G_m$; if none passes, return
+  the longest candidate with an explicit abstention flag.
+\end{enumerate}
+\end{figure}
 
 \begin{theorem}[High-confidence value certificate]\label{thm:certificate}
 On event~\eqref{eq:qevent}, simultaneously for every memory $m$,
